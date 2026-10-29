@@ -1,0 +1,1458 @@
+<!DOCTYPE html>
+<html lang="en" data-accent="red">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="dark">
+<meta name="referrer" content="no-referrer">
+<!-- CSP: nothing may load from the network. Inline style/script only. -->
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; script-src 'unsafe-inline'; img-src data:; base-uri 'none'; form-action 'none'">
+<title>DEAD CLOCK</title>
+<link rel="icon" href="data:,">
+<style>
+/* ==========================================================================
+   DEAD CLOCK — tokens
+   ========================================================================== */
+:root {
+  --bg: #090909;
+  --surface: #0f0f0f;
+  --line: #222222;
+  --line-strong: #3a3a3a;
+  --text: #f2f2f2;
+  --muted: #8a8a8a;
+
+  /* Accent (Muted Red by default). --accent for fills, --accent-text for small text. */
+  --accent: #c74440;
+  --accent-text: #e0605b;
+  --accent-soft: rgba(199, 68, 64, 0.14);
+
+  --font: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+
+  --s-1: 4px;
+  --s-2: 8px;
+  --s-3: 12px;
+  --s-4: 16px;
+  --s-5: 24px;
+  --s-6: 32px;
+  --s-7: 48px;
+  --radius: 2px;
+}
+:root[data-accent="amber"] {
+  --accent: #c89545;
+  --accent-text: #c89545;
+  --accent-soft: rgba(200, 149, 69, 0.14);
+}
+
+/* ==========================================================================
+   Base
+   ========================================================================== */
+*, *::before, *::after { box-sizing: border-box; }
+[hidden] { display: none !important; }
+
+html {
+  background: var(--bg);
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+}
+html.modal-open, html.modal-open body { overflow: hidden; }
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font);
+  font-size: 14px;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+
+button, input { font: inherit; color: inherit; }
+p, h1, h2, dl, dd, fieldset { margin: 0; padding: 0; }
+fieldset { border: 0; min-width: 0; }
+
+.sr-only {
+  position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0;
+  overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0;
+}
+
+/* Very light scanline + one slow moving band (decorative, tiny opacity). */
+.scanlines {
+  position: fixed; inset: 0; z-index: 1; pointer-events: none;
+  background: repeating-linear-gradient(to bottom, rgba(255,255,255,0.018) 0, rgba(255,255,255,0.018) 1px, transparent 1px, transparent 3px);
+}
+.scanlines::after {
+  content: ""; position: absolute; left: 0; right: 0; top: -120px; height: 120px;
+  background: linear-gradient(to bottom, transparent, rgba(255,255,255,0.025), transparent);
+  animation: scan 9s linear infinite;
+}
+@keyframes scan { to { transform: translateY(calc(100vh + 240px)); } }
+
+.app {
+  position: relative; z-index: 2;
+  max-width: 900px; margin: 0 auto;
+  padding: var(--s-4) var(--s-4) var(--s-6);
+  animation: fade-in 0.7s ease both;
+}
+@keyframes fade-in { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: none; } }
+
+/* ==========================================================================
+   Header
+   ========================================================================== */
+.header { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--s-3); padding-bottom: var(--s-4); }
+.brand { display: flex; flex-wrap: wrap; align-items: baseline; gap: var(--s-3); min-width: 0; }
+.logo { font-size: 16px; font-weight: 700; letter-spacing: 0.22em; }
+.cursor { display: inline-block; width: 0.55em; height: 1em; margin-left: 4px; vertical-align: -0.12em; background: var(--accent); animation: blink 1.1s steps(1) infinite; }
+@keyframes blink { 50% { opacity: 0; } }
+.status { display: inline-flex; align-items: center; gap: var(--s-2); font-size: 11px; letter-spacing: 0.14em; color: var(--muted); }
+.dot { width: 7px; height: 7px; border-radius: 50%; background: var(--accent); animation: dot 2.6s ease-in-out infinite; }
+@keyframes dot { 50% { opacity: 0.25; } }
+.tagline { flex-basis: 100%; font-size: 12px; color: var(--muted); }
+
+/* ==========================================================================
+   Panels & typography
+   ========================================================================== */
+.panel { padding: var(--s-5) 0; border-top: 1px solid var(--line); }
+.label { font-size: 11px; font-weight: 400; letter-spacing: 0.16em; color: var(--muted); margin-bottom: var(--s-4); }
+.label::before { content: "> "; color: var(--accent-text); }
+.muted { color: var(--muted); }
+.small { font-size: 12px; }
+.hint { font-size: 12px; color: var(--muted); margin-top: var(--s-3); }
+.num { font-variant-numeric: tabular-nums; }
+
+.big-days {
+  font-size: clamp(40px, 14vw, 128px);
+  line-height: 1; font-weight: 700; letter-spacing: -0.03em;
+  font-variant-numeric: tabular-nums; max-width: 100%;
+}
+.big-label { margin-top: var(--s-2); font-size: 12px; letter-spacing: 0.22em; color: var(--accent-text); }
+
+.units {
+  display: grid; grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 1px; margin-top: var(--s-5);
+  background: var(--line); border: 1px solid var(--line);
+}
+.unit { background: var(--bg); padding: var(--s-3) var(--s-2); text-align: center; min-width: 0; }
+.unit-num { display: block; font-size: clamp(20px, 5.5vw, 32px); font-weight: 700; font-variant-numeric: tabular-nums; line-height: 1.2; }
+.unit-label { display: block; margin-top: 2px; font-size: 10px; letter-spacing: 0.14em; color: var(--muted); text-transform: uppercase; }
+@media (min-width: 560px) { .units { grid-template-columns: repeat(6, minmax(0, 1fr)); } }
+.tick { animation: pulse 0.5s ease-out; }
+@keyframes pulse { from { opacity: 0.55; color: var(--accent-text); } to { opacity: 1; color: var(--text); } }
+
+.core-message { margin-top: var(--s-5); font-size: 13px; color: var(--muted); }
+.core-message::before { content: "$ "; color: var(--accent-text); }
+
+.state-title { font-size: clamp(16px, 4vw, 22px); font-weight: 700; letter-spacing: 0.1em; }
+.state-text { margin: var(--s-2) 0 var(--s-4); color: var(--muted); font-size: 12px; }
+
+.pct { font-size: clamp(22px, 6vw, 34px); font-weight: 700; font-variant-numeric: tabular-nums; }
+.bar { height: 6px; margin: var(--s-3) 0; background: var(--line); overflow: hidden; }
+.bar-fill { height: 100%; width: 0; background: var(--accent); transition: width 0.6s linear; }
+.bar-meta { display: flex; flex-wrap: wrap; justify-content: space-between; gap: var(--s-2) var(--s-4); font-size: 11px; letter-spacing: 0.08em; color: var(--muted); font-variant-numeric: tabular-nums; }
+
+.today-row { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: var(--s-2) var(--s-4); }
+.today-time { font-size: clamp(30px, 9vw, 52px); font-weight: 700; font-variant-numeric: tabular-nums; letter-spacing: 0.02em; }
+.today-pct { font-size: 12px; color: var(--muted); font-variant-numeric: tabular-nums; }
+
+.objective-text { font-size: clamp(18px, 4.6vw, 28px); font-weight: 700; line-height: 1.3; margin-bottom: var(--s-3); }
+.objective-text:focus { outline: none; }
+.obj-state { font-size: 12px; letter-spacing: 0.12em; color: var(--muted); margin-bottom: var(--s-4); }
+.obj-state.is-done { color: var(--accent-text); }
+
+.quote { font-size: clamp(14px, 3.6vw, 18px); }
+.quote::before { content: "> "; color: var(--accent-text); }
+
+.footer { padding-top: var(--s-5); border-top: 1px solid var(--line); font-size: 11px; letter-spacing: 0.1em; color: var(--muted); display: grid; gap: var(--s-2); }
+.footer .disclaimer { letter-spacing: 0; }
+
+.notice { margin: 0 0 var(--s-3); padding: var(--s-2) var(--s-3); border: 1px solid var(--line-strong); font-size: 12px; color: var(--muted); }
+.notice::before { content: "i  "; color: var(--accent-text); font-weight: 700; }
+
+/* ==========================================================================
+   Form controls
+   ========================================================================== */
+.row { display: flex; flex-wrap: wrap; align-items: center; gap: var(--s-3); }
+.row.between { justify-content: space-between; }
+.row.center { justify-content: center; }
+
+.btn {
+  display: inline-flex; align-items: center; justify-content: center; gap: var(--s-2);
+  min-height: 44px; padding: 0 var(--s-4);
+  background: transparent; color: var(--text);
+  border: 1px solid var(--line-strong); border-radius: var(--radius);
+  font-size: 12px; letter-spacing: 0.12em; cursor: pointer;
+  transition: border-color 0.15s, background-color 0.15s, color 0.15s;
+}
+.btn:hover { border-color: var(--text); }
+.btn:disabled { opacity: 0.4; cursor: not-allowed; }
+.btn:disabled:hover { border-color: var(--line-strong); }
+.btn--primary { background: var(--text); color: #090909; border-color: var(--text); font-weight: 700; }
+.btn--primary:hover { background: var(--accent-text); border-color: var(--accent-text); }
+.btn--primary:disabled:hover { background: var(--text); border-color: var(--text); }
+.btn--xl { width: 100%; min-height: 56px; font-size: 14px; letter-spacing: 0.2em; }
+@media (min-width: 640px) { .btn--xl { width: auto; min-width: 280px; } }
+.btn--sm { padding: 0 var(--s-3); }
+
+:where(button, input, a, [tabindex]):focus-visible { outline: 2px solid var(--accent-text); outline-offset: 2px; }
+
+.input {
+  width: 100%; min-height: 44px; padding: 0 var(--s-3);
+  background: var(--surface); color: var(--text);
+  border: 1px solid var(--line-strong); border-radius: var(--radius);
+  color-scheme: dark;
+}
+.input::placeholder { color: #666; }
+.input[aria-invalid="true"] { border-color: var(--accent-text); }
+.field { display: grid; gap: var(--s-2); margin-bottom: var(--s-4); min-width: 0; }
+.field > label, .legend { font-size: 12px; letter-spacing: 0.08em; }
+.help { font-size: 12px; color: var(--muted); }
+.err { min-height: 0; font-size: 12px; color: var(--accent-text); }
+.err:not(:empty)::before { content: "! "; font-weight: 700; }
+
+/* Radio / checkbox rendered as terminal-style options: "[x] LABEL". */
+.opts { display: flex; flex-wrap: wrap; gap: var(--s-2); }
+.opt { position: relative; display: inline-flex; }
+.opt input { position: absolute; inset: 0; width: 100%; height: 100%; margin: 0; opacity: 0; cursor: pointer; }
+.opt span {
+  display: inline-flex; align-items: center; min-height: 44px; padding: 0 var(--s-3);
+  border: 1px solid var(--line-strong); border-radius: var(--radius);
+  font-size: 12px; letter-spacing: 0.08em; color: var(--muted);
+  transition: border-color 0.15s, color 0.15s, background-color 0.15s;
+}
+.opt span::before { content: "[ ] "; white-space: pre; margin-right: 6px; }
+.opt input:checked + span { border-color: var(--accent-text); color: var(--text); background: var(--accent-soft); }
+.opt input:checked + span::before { content: "[x] "; color: var(--accent-text); }
+.opt input:focus-visible + span { outline: 2px solid var(--accent-text); outline-offset: 2px; }
+.opt:hover span { border-color: var(--text); }
+
+/* ==========================================================================
+   Focus mode
+   ========================================================================== */
+.app.is-focus .hide-in-focus { display: none; }
+.ring {
+  --p: 0;
+  width: clamp(180px, 62vw, 260px); aspect-ratio: 1; margin: var(--s-5) auto;
+  border-radius: 50%;
+  background: conic-gradient(var(--accent) calc(var(--p) * 1%), var(--line) 0);
+  display: grid; place-items: center;
+}
+.ring-inner { width: calc(100% - 12px); height: calc(100% - 12px); border-radius: 50%; background: var(--bg); display: grid; place-content: center; text-align: center; gap: var(--s-1); }
+.timer { font-size: clamp(34px, 11vw, 56px); font-weight: 700; font-variant-numeric: tabular-nums; line-height: 1.1; }
+.complete-msg { min-height: 1.5em; margin-bottom: var(--s-4); text-align: center; font-weight: 700; letter-spacing: 0.06em; color: var(--accent-text); }
+.focus-run .objective-text { text-align: center; }
+.focus-run .small { text-align: center; }
+
+/* ==========================================================================
+   Modal
+   ========================================================================== */
+.modal {
+  position: fixed; inset: 0; z-index: 10;
+  display: flex; align-items: flex-start; justify-content: center;
+  padding: var(--s-4); overflow-y: auto; overscroll-behavior: contain;
+  background: rgba(0, 0, 0, 0.78);
+  visibility: hidden; opacity: 0;
+  transition: opacity 0.15s ease, visibility 0s linear 0.15s;
+}
+.modal.is-open { visibility: visible; opacity: 1; transition-delay: 0s; }
+.dialog {
+  width: 100%; max-width: 520px; margin: auto;
+  background: var(--bg); border: 1px solid var(--line-strong);
+  padding: var(--s-5); transform: translateY(6px); transition: transform 0.15s ease;
+}
+.modal.is-open .dialog { transform: none; }
+.dialog h2 { font-size: 14px; letter-spacing: 0.18em; margin-bottom: var(--s-2); }
+.dialog .intro { font-size: 12px; color: var(--muted); margin-bottom: var(--s-5); }
+.confirm-box { border: 1px solid var(--accent); background: var(--accent-soft); padding: var(--s-3); margin-top: var(--s-3); }
+.confirm-box p { font-size: 12px; margin-bottom: var(--s-3); }
+.dialog-actions { display: flex; flex-wrap: wrap; gap: var(--s-3); margin-top: var(--s-5); }
+.dialog-actions .btn { flex: 1 1 140px; }
+.divider { border: 0; border-top: 1px solid var(--line); margin: var(--s-5) 0; }
+
+@media (max-width: 400px) {
+  .app { padding-left: var(--s-3); padding-right: var(--s-3); }
+  .dialog { padding: var(--s-4); }
+}
+
+/* ==========================================================================
+   Reduced motion
+   ========================================================================== */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation: none !important; transition: none !important; }
+  .scanlines::after { display: none; }
+}
+</style>
+</head>
+<body>
+<div class="scanlines" aria-hidden="true"></div>
+
+<noscript><p style="padding:16px">DEAD CLOCK needs JavaScript to run.</p></noscript>
+
+<main class="app" id="app">
+
+  <!-- 4.1 Header -->
+  <header class="header">
+    <div class="brand">
+      <h1 class="logo">DEAD CLOCK<span class="cursor" aria-hidden="true"></span></h1>
+      <span class="status"><span class="dot" aria-hidden="true"></span>SYSTEM ACTIVE</span>
+    </div>
+    <button class="btn btn--sm" id="settingsBtn" type="button" aria-label="Open settings" aria-haspopup="dialog">SETTINGS</button>
+    <p class="tagline">A quiet reminder that your time is finite.</p>
+  </header>
+
+  <p class="notice" id="notice" role="status" hidden>Local saving is unavailable in this embed.</p>
+
+  <!-- 4.2 Life countdown -->
+  <section class="panel hide-in-focus" aria-labelledby="lifeLabel">
+    <h2 class="label" id="lifeLabel">LIFE_PROCESS</h2>
+
+    <div id="lifeActive" hidden>
+      <div class="big-days" id="daysBig">0</div>
+      <div class="big-label">DAYS REMAINING</div>
+      <div class="units" role="group" aria-label="Time remaining on your configured timeline">
+        <div class="unit"><span class="unit-num" id="uYears">0</span><span class="unit-label">Years</span></div>
+        <div class="unit"><span class="unit-num" id="uMonths">0</span><span class="unit-label">Months</span></div>
+        <div class="unit"><span class="unit-num" id="uDays">0</span><span class="unit-label">Days</span></div>
+        <div class="unit"><span class="unit-num" id="uHours">00</span><span class="unit-label">Hours</span></div>
+        <div class="unit"><span class="unit-num" id="uMinutes">00</span><span class="unit-label">Minutes</span></div>
+        <div class="unit"><span class="unit-num" id="uSeconds">00</span><span class="unit-label">Seconds</span></div>
+      </div>
+      <p class="core-message">Your time is finite. Use it deliberately.</p>
+    </div>
+
+    <div id="lifeEmpty">
+      <p class="state-title">SET YOUR TIMELINE</p>
+      <p class="state-text">Choose a personal timeline for reflection. This is not a prediction.</p>
+      <button class="btn btn--primary" id="configureBtn" type="button">CONFIGURE CLOCK</button>
+    </div>
+
+    <div id="lifeEnded" hidden>
+      <p class="state-title">THE CONFIGURED TIMELINE HAS ENDED.</p>
+      <p class="state-text">Adjust the timeline in settings to continue.</p>
+      <button class="btn" id="adjustBtn" type="button">OPEN SETTINGS</button>
+    </div>
+  </section>
+
+  <!-- 4.3 Life progress -->
+  <section class="panel hide-in-focus" aria-labelledby="usedLabel">
+    <h2 class="label" id="usedLabel">TIME_USED</h2>
+    <div id="progActive" hidden>
+      <p class="pct" id="pctText">0.00% USED</p>
+      <div class="bar" id="lifeBarTrack" role="progressbar" aria-label="Share of the configured timeline used" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0">
+        <div class="bar-fill" id="lifeBar"></div>
+      </div>
+      <div class="bar-meta"><span id="daysLived">0 DAYS LIVED</span><span id="daysLeft">0 DAYS REMAINING</span></div>
+    </div>
+    <p class="state-text" id="progEmpty">Configure your timeline to see how much has been used.</p>
+  </section>
+
+  <!-- 4.4 Today -->
+  <section class="panel hide-in-focus" aria-labelledby="todayLabel">
+    <h2 class="label" id="todayLabel">TODAY_PROCESS</h2>
+    <div class="today-row">
+      <div class="today-time" id="todayTime">00:00:00</div>
+      <div class="today-pct"><span id="dateLabel"></span> &middot; <span id="todayPct">0.0% USED</span></div>
+    </div>
+    <div class="bar" aria-hidden="true"><div class="bar-fill" id="todayBar"></div></div>
+    <p class="hint">You will never get today back.</p>
+  </section>
+
+  <!-- 4.5 Objective -->
+  <section class="panel hide-in-focus" aria-labelledby="objLabel">
+    <h2 class="label" id="objLabel">PRIMARY_OBJECTIVE</h2>
+
+    <div id="objEdit">
+      <label class="sr-only" for="objInput">Primary objective for today</label>
+      <input class="input" id="objInput" type="text" maxlength="120" autocomplete="off" spellcheck="false"
+             placeholder="What must move forward today?" aria-describedby="objMsg objCount">
+      <div class="row between" style="margin:var(--s-2) 0 var(--s-4)">
+        <p class="err" id="objMsg" aria-live="polite"></p>
+        <span class="small muted num" id="objCount">0/120</span>
+      </div>
+      <button class="btn btn--primary" id="lockBtn" type="button">LOCK OBJECTIVE</button>
+    </div>
+
+    <div id="objView" hidden>
+      <p class="objective-text" id="objText" tabindex="-1"></p>
+      <p class="obj-state" id="objState"></p>
+      <div class="row">
+        <button class="btn" id="completeBtn" type="button">MARK COMPLETE</button>
+        <button class="btn btn--sm" id="editBtn" type="button">EDIT</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- 4.6 Start now (setup) -->
+  <section class="panel hide-in-focus" id="focusSetup" aria-labelledby="focusLabel">
+    <h2 class="label" id="focusLabel">FOCUS_SESSION</h2>
+    <fieldset class="field">
+      <legend class="legend">Duration</legend>
+      <div class="opts" style="margin-top:var(--s-2)">
+        <label class="opt"><input type="radio" name="setupFocus" value="25"><span>25 MIN</span></label>
+        <label class="opt"><input type="radio" name="setupFocus" value="50"><span>50 MIN</span></label>
+        <label class="opt"><input type="radio" name="setupFocus" value="custom"><span>CUSTOM</span></label>
+      </div>
+    </fieldset>
+    <div class="field" id="setupCustomRow" hidden>
+      <label for="setupCustomInput">Custom minutes (1&ndash;180)</label>
+      <input class="input" id="setupCustomInput" type="number" min="1" max="180" step="1" inputmode="numeric" aria-describedby="setupErr">
+      <p class="err" id="setupErr" aria-live="polite"></p>
+    </div>
+    <button class="btn btn--primary btn--xl" id="startBtn" type="button" disabled aria-describedby="startHint">START NOW</button>
+    <p class="hint" id="startHint">Define one objective to begin.</p>
+  </section>
+
+  <!-- 4.6 Focus mode (running) -->
+  <section class="panel focus-run" id="focusRun" aria-labelledby="runLabel" hidden>
+    <h2 class="label" id="runLabel">FOCUS_MODE</h2>
+    <p class="small muted">CURRENT OBJECTIVE</p>
+    <p class="objective-text" id="runObjective"></p>
+    <div class="ring" id="ring">
+      <div class="ring-inner">
+        <span class="timer" id="runTime">25:00</span>
+        <span class="small muted" id="runState">STATUS: RUNNING</span>
+      </div>
+    </div>
+    <p class="complete-msg" id="runMsg" aria-live="polite"></p>
+    <div class="row center">
+      <button class="btn" id="pauseBtn" type="button">PAUSE</button>
+      <button class="btn" id="resumeBtn" type="button" hidden>RESUME</button>
+      <button class="btn" id="resetTimerBtn" type="button">RESET</button>
+      <button class="btn" id="endBtn" type="button">END SESSION</button>
+    </div>
+  </section>
+
+  <!-- 4.7 Stoic prompt -->
+  <section class="panel hide-in-focus" aria-label="Daily prompt">
+    <p class="quote" id="quote"></p>
+  </section>
+
+  <!-- 4.8 Footer -->
+  <footer class="footer">
+    <span>LOCAL-FIRST &middot; NO ACCOUNT &middot; NO TRACKING</span>
+    <span>YOUR DATA STAYS IN THIS BROWSER</span>
+    <span class="disclaimer">This is a personal reflection timer, not a prediction.</span>
+  </footer>
+
+  <!-- Polite live region for status messages (never the per-second countdown) -->
+  <div class="sr-only" id="live" aria-live="polite" role="status"></div>
+</main>
+
+<!-- ======================= Settings modal ======================= -->
+<div class="modal" id="settingsModal">
+  <div class="dialog" id="settingsDialog" role="dialog" aria-modal="true" aria-labelledby="settingsTitle" aria-describedby="settingsIntro">
+    <h2 id="settingsTitle">SETTINGS</h2>
+    <p class="intro" id="settingsIntro">
+      <span id="onboardNote">Choose a personal timeline for reflection. This is not a prediction.</span>
+      <span>This is a personal reflection timer, not a prediction.</span>
+    </p>
+
+    <form id="settingsForm" novalidate>
+      <div class="field">
+        <label for="fDob">Date of birth</label>
+        <input class="input" id="fDob" name="dob" type="date" min="1900-01-01" aria-describedby="eDob">
+        <p class="err" id="eDob" aria-live="polite"></p>
+      </div>
+
+      <fieldset class="field">
+        <legend class="legend">Life end mode</legend>
+        <div class="opts" style="margin-top:var(--s-2)">
+          <label class="opt"><input type="radio" name="mode" value="years"><span>Lifespan in years</span></label>
+          <label class="opt"><input type="radio" name="mode" value="date"><span>Specific target date</span></label>
+        </div>
+      </fieldset>
+
+      <div class="field" id="rowLifespan">
+        <label for="fLifespan">Expected lifespan (years)</label>
+        <input class="input" id="fLifespan" name="lifespan" type="number" min="1" max="150" step="1" inputmode="numeric" aria-describedby="hLifespan eLifespan">
+        <p class="help" id="hLifespan">A personal marker you choose &mdash; not a medical prediction.</p>
+        <p class="err" id="eLifespan" aria-live="polite"></p>
+      </div>
+
+      <div class="field" id="rowTarget" hidden>
+        <label for="fTarget">Target date</label>
+        <input class="input" id="fTarget" name="target" type="date" aria-describedby="hTarget eTarget">
+        <p class="help" id="hTarget">Interpreted in your device's local time zone.</p>
+        <p class="err" id="eTarget" aria-live="polite"></p>
+      </div>
+
+      <div id="advanced">
+        <hr class="divider">
+
+        <fieldset class="field">
+          <legend class="legend">Accent color</legend>
+          <div class="opts" style="margin-top:var(--s-2)">
+            <label class="opt"><input type="radio" name="accent" value="red"><span>Muted Red</span></label>
+            <label class="opt"><input type="radio" name="accent" value="amber"><span>Amber</span></label>
+          </div>
+        </fieldset>
+
+        <fieldset class="field">
+          <legend class="legend">Focus duration</legend>
+          <div class="opts" style="margin-top:var(--s-2)">
+            <label class="opt"><input type="radio" name="focus" value="25"><span>25 MIN</span></label>
+            <label class="opt"><input type="radio" name="focus" value="50"><span>50 MIN</span></label>
+            <label class="opt"><input type="radio" name="focus" value="custom"><span>CUSTOM</span></label>
+          </div>
+        </fieldset>
+
+        <div class="field" id="rowFocusCustom" hidden>
+          <label for="fFocusCustom">Custom focus minutes (1&ndash;180)</label>
+          <input class="input" id="fFocusCustom" name="focusCustom" type="number" min="1" max="180" step="1" inputmode="numeric" aria-describedby="eFocus">
+          <p class="err" id="eFocus" aria-live="polite"></p>
+        </div>
+
+        <div class="field">
+          <span class="legend">Sound</span>
+          <label class="opt"><input type="checkbox" id="fSound" role="switch"><span>Short beep when a session ends (off by default)</span></label>
+        </div>
+
+        <hr class="divider">
+
+        <div class="field">
+          <span class="legend">Reset local data</span>
+          <p class="help">Removes everything this app saved in this browser.</p>
+          <div><button class="btn btn--sm" id="resetBtn" type="button" aria-expanded="false" aria-controls="resetConfirm">RESET LOCAL DATA</button></div>
+          <div class="confirm-box" id="resetConfirm" hidden>
+            <p>This permanently erases your timeline, objectives and settings from this browser. Continue?</p>
+            <div class="row">
+              <button class="btn btn--sm" id="resetYes" type="button">YES, ERASE EVERYTHING</button>
+              <button class="btn btn--sm" id="resetNo" type="button">KEEP MY DATA</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="dialog-actions">
+        <button class="btn btn--primary" id="saveBtn" type="submit">SAVE SETTINGS</button>
+        <button class="btn" id="cancelBtn" type="button">CANCEL</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<script>
+(() => {
+  'use strict';
+
+  /* ======================================================================
+     Constants
+     ====================================================================== */
+  const NS = 'deadClock.';
+  const KEYS = { settings: 'settings', objective: 'objective', history: 'history', timer: 'timer' };
+  const DAY_MS = 86400000;
+  const OBJECTIVE_MAX = 120;
+  const HISTORY_MAX = 7;
+
+  // Original prompts (not attributed to anyone). One is chosen per local day.
+  const PROMPTS = [
+    'Attention is how you spend your life.',
+    'Do the work while the hour is yours.',
+    'A finite day deserves a deliberate choice.',
+    'Later is not a place you can live in.',
+    'One clear action outweighs ten vague intentions.',
+    'The day is short. Spend it on purpose.',
+    'Begin where you are, with what you have.',
+    'Calm is a place to work from, not a place to hide.',
+    'A small step today outlasts a big plan for someday.',
+    'You cannot save time. You can only choose how it leaves.',
+    'Make the next hour worth remembering.',
+    'Wanting is not starting. Start.'
+  ];
+
+  const defaultSettings = () => ({
+    dob: '', mode: 'years', lifespan: 80, target: '',
+    accent: 'red', focus: '25', focusCustom: 30, sound: false
+  });
+  const emptyObjective = (dateKey) => ({ text: '', locked: false, done: false, date: dateKey, createdAt: 0 });
+
+  /* ======================================================================
+     Storage — localStorage wrapped in try/catch with in-memory fallback
+     ====================================================================== */
+  const Store = (() => {
+    let ls = null;
+    let available = false;
+    const mem = new Map();
+    try {
+      ls = window.localStorage;
+      const probe = NS + 'probe';
+      ls.setItem(probe, '1');
+      ls.removeItem(probe);
+      available = true;
+    } catch (_) { ls = null; available = false; }
+
+    return {
+      isAvailable: () => available,
+      get(key) {
+        if (available) {
+          try { return ls.getItem(NS + key); } catch (_) { available = false; }
+        }
+        return mem.has(key) ? mem.get(key) : null;
+      },
+      set(key, value) {
+        mem.set(key, value);
+        if (available) {
+          try { ls.setItem(NS + key, value); return true; } catch (_) { available = false; }
+        }
+        return false;
+      },
+      remove(key) {
+        mem.delete(key);
+        if (available) { try { ls.removeItem(NS + key); } catch (_) { available = false; } }
+      },
+      clear() {
+        mem.clear();
+        if (available) {
+          try {
+            Object.keys(ls).filter((k) => k.indexOf(NS) === 0).forEach((k) => ls.removeItem(k));
+          } catch (_) { available = false; }
+        }
+      }
+    };
+  })();
+
+  function readJSON(key) {
+    try {
+      const raw = Store.get(key);
+      return raw ? JSON.parse(raw) : null;
+    } catch (_) { return null; }
+  }
+  function writeJSON(key, value) {
+    const ok = Store.set(key, JSON.stringify(value));
+    updateNotice();
+    return ok;
+  }
+
+  /* ======================================================================
+     Date helpers (all local time; never parse YYYY-MM-DD as UTC)
+     ====================================================================== */
+  const pad2 = (n) => String(n).padStart(2, '0');
+  const clamp = (n, lo, hi) => Math.min(hi, Math.max(lo, n));
+  const toKey = (d) => d.getFullYear() + '-' + pad2(d.getMonth() + 1) + '-' + pad2(d.getDate());
+  const startOfDay = (d) => new Date(d.getFullYear(), d.getMonth(), d.getDate());
+  const isLeap = (y) => (y % 4 === 0 && y % 100 !== 0) || y % 400 === 0;
+
+  /** Parse "YYYY-MM-DD" into a local Date at 00:00. Returns null if invalid. */
+  function parseLocalDate(str) {
+    const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(typeof str === 'string' ? str : '');
+    if (!m) return null;
+    const y = +m[1], mo = +m[2] - 1, d = +m[3];
+    const dt = new Date(y, mo, d);
+    if (dt.getFullYear() !== y || dt.getMonth() !== mo || dt.getDate() !== d) return null;
+    return dt;
+  }
+
+  /** Add N months, clamping the day to the target month's length (Jan 31 + 1m = Feb 28/29). */
+  function addMonths(date, n) {
+    const total = date.getMonth() + n;
+    const y = date.getFullYear() + Math.floor(total / 12);
+    const m = ((total % 12) + 12) % 12;
+    const last = new Date(y, m + 1, 0).getDate();
+    return new Date(y, m, Math.min(date.getDate(), last),
+      date.getHours(), date.getMinutes(), date.getSeconds(), date.getMilliseconds());
+  }
+
+  /** Add N years. A Feb 29 birthday lands on Feb 28 in non-leap years. */
+  function addYears(date, n) {
+    const y = date.getFullYear() + n;
+    const d = (date.getMonth() === 1 && date.getDate() === 29 && !isLeap(y)) ? 28 : date.getDate();
+    return new Date(y, date.getMonth(), d, date.getHours(), date.getMinutes(), date.getSeconds(), date.getMilliseconds());
+  }
+
+  /** Add N calendar days while keeping the wall-clock time (DST-safe). */
+  function addDays(date, n) {
+    return new Date(date.getFullYear(), date.getMonth(), date.getDate() + n,
+      date.getHours(), date.getMinutes(), date.getSeconds(), date.getMilliseconds());
+  }
+
+  /** Whole calendar days from `from` to `to` (0 if to <= from). */
+  function wholeDaysBetween(from, to) {
+    if (to <= from) return 0;
+    let d = Math.round((startOfDay(to) - startOfDay(from)) / DAY_MS);
+    if (addDays(from, d) > to) d -= 1;
+    return Math.max(0, d);
+  }
+
+  /** Calendar difference: full years, full months, remaining days, then h/m/s. */
+  function calendarDiff(from, to) {
+    if (to <= from) return { years: 0, months: 0, days: 0, hours: 0, minutes: 0, seconds: 0 };
+    let months = (to.getFullYear() - from.getFullYear()) * 12 + (to.getMonth() - from.getMonth());
+    let cursor = addMonths(from, months);
+    if (cursor > to) { months -= 1; cursor = addMonths(from, months); }
+    months = Math.max(0, months);
+    const days = wholeDaysBetween(cursor, to);
+    const rest = Math.max(0, to - addDays(cursor, days));
+    return {
+      years: Math.floor(months / 12),
+      months: months % 12,
+      days,
+      hours: Math.floor(rest / 3600000),
+      minutes: Math.floor((rest % 3600000) / 60000),
+      seconds: Math.floor((rest % 60000) / 1000)
+    };
+  }
+
+  /* ======================================================================
+     State & DOM cache
+     ====================================================================== */
+  const state = {
+    settings: defaultSettings(),
+    firstVisit: true,
+    timeline: null,          // { dob: Date, end: Date } or null
+    objective: null,
+    history: [],
+    timer: null,             // { status, durationMs, endAt, remainingMs, objective }
+    dayKey: '',
+    tickId: 0
+  };
+
+  const IDS = [
+    'app', 'notice', 'settingsBtn',
+    'lifeActive', 'lifeEmpty', 'lifeEnded', 'daysBig', 'uYears', 'uMonths', 'uDays', 'uHours', 'uMinutes', 'uSeconds',
+    'configureBtn', 'adjustBtn',
+    'progActive', 'progEmpty', 'pctText', 'lifeBar', 'lifeBarTrack', 'daysLived', 'daysLeft',
+    'dateLabel', 'todayTime', 'todayPct', 'todayBar',
+    'objEdit', 'objView', 'objInput', 'objCount', 'objMsg', 'lockBtn', 'objText', 'objState', 'completeBtn', 'editBtn',
+    'focusSetup', 'setupCustomRow', 'setupCustomInput', 'setupErr', 'startBtn', 'startHint',
+    'focusRun', 'runObjective', 'ring', 'runTime', 'runState', 'runMsg', 'pauseBtn', 'resumeBtn', 'resetTimerBtn', 'endBtn',
+    'quote', 'live',
+    'settingsModal', 'settingsDialog', 'settingsForm', 'fDob', 'eDob', 'rowLifespan', 'fLifespan', 'eLifespan',
+    'rowTarget', 'fTarget', 'eTarget', 'rowFocusCustom', 'fFocusCustom', 'eFocus', 'fSound', 'advanced', 'onboardNote',
+    'resetBtn', 'resetConfirm', 'resetYes', 'resetNo', 'saveBtn', 'cancelBtn'
+  ];
+  const el = {};
+  IDS.forEach((id) => { el[id] = document.getElementById(id); });
+
+  /* ======================================================================
+     Small DOM helpers (skip redundant updates)
+     ====================================================================== */
+  function setText(node, text) {
+    if (node.textContent === text) return false;
+    node.textContent = text;
+    return true;
+  }
+  function setHidden(node, hidden) {
+    if (node.hidden !== hidden) node.hidden = hidden;
+  }
+  function setStyle(node, prop, value) {
+    if (node.style[prop] !== value) node.style[prop] = value;
+  }
+  function pulse(node) {
+    node.classList.remove('tick');
+    void node.offsetWidth; // restart animation
+    node.classList.add('tick');
+  }
+  const fmtInt = (n) => Number(n).toLocaleString('en-US');
+  function announce(msg) {
+    el.live.textContent = '';
+    window.setTimeout(() => { el.live.textContent = msg; }, 40);
+  }
+  function updateNotice() { setHidden(el.notice, Store.isAvailable()); }
+
+  const radios = (name) => Array.prototype.slice.call(document.querySelectorAll('input[name="' + name + '"]'));
+  function getRadio(name) {
+    const r = radios(name).filter((i) => i.checked)[0];
+    return r ? r.value : '';
+  }
+  function setRadio(name, value) {
+    radios(name).forEach((i) => { i.checked = i.value === String(value); });
+  }
+
+  /* ======================================================================
+     Loading persisted data (with validation)
+     ====================================================================== */
+  function loadSettings() {
+    const raw = readJSON(KEYS.settings);
+    const s = defaultSettings();
+    if (!raw || typeof raw !== 'object') return { settings: s, found: false };
+
+    const today = startOfDay(new Date());
+    const dob = parseLocalDate(raw.dob);
+    if (dob && dob <= today && dob.getFullYear() >= 1900) s.dob = raw.dob;
+    if (raw.mode === 'years' || raw.mode === 'date') s.mode = raw.mode;
+    if (Number.isInteger(raw.lifespan) && raw.lifespan >= 1 && raw.lifespan <= 150) s.lifespan = raw.lifespan;
+    if (parseLocalDate(raw.target)) s.target = raw.target;
+    if (raw.accent === 'red' || raw.accent === 'amber') s.accent = raw.accent;
+    if (raw.focus === '25' || raw.focus === '50' || raw.focus === 'custom') s.focus = raw.focus;
+    if (Number.isInteger(raw.focusCustom) && raw.focusCustom >= 1 && raw.focusCustom <= 180) s.focusCustom = raw.focusCustom;
+    s.sound = raw.sound === true;
+    return { settings: s, found: true };
+  }
+
+  function loadHistory() {
+    const raw = readJSON(KEYS.history);
+    if (!Array.isArray(raw)) return [];
+    return raw
+      .filter((h) => h && typeof h.date === 'string' && typeof h.text === 'string')
+      .map((h) => ({ date: h.date, text: h.text.slice(0, OBJECTIVE_MAX), done: h.done === true }))
+      .slice(-HISTORY_MAX);
+  }
+
+  function archiveObjective(obj) {
+    if (!obj || !obj.text.trim()) return;
+    state.history = state.history.filter((h) => h.date !== obj.date);
+    state.history.push({ date: obj.date, text: obj.text.slice(0, OBJECTIVE_MAX), done: obj.done === true });
+    state.history.sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : 0));
+    state.history = state.history.slice(-HISTORY_MAX);
+    writeJSON(KEYS.history, state.history);
+  }
+
+  function loadObjective(dayKey) {
+    const raw = readJSON(KEYS.objective);
+    if (!raw || typeof raw !== 'object' || typeof raw.text !== 'string' || typeof raw.date !== 'string') {
+      return emptyObjective(dayKey);
+    }
+    const obj = {
+      text: raw.text.slice(0, OBJECTIVE_MAX),
+      locked: raw.locked === true && raw.text.trim().length > 0,
+      done: raw.done === true && raw.locked === true,
+      date: raw.date,
+      createdAt: Number.isFinite(raw.createdAt) ? raw.createdAt : 0
+    };
+    if (obj.date !== dayKey) {          // stale: archive and start fresh
+      archiveObjective(obj);
+      const fresh = emptyObjective(dayKey);
+      writeJSON(KEYS.objective, fresh);
+      return fresh;
+    }
+    return obj;
+  }
+
+  function loadTimer() {
+    const raw = readJSON(KEYS.timer);
+    if (!raw || typeof raw !== 'object') return null;
+    const okNum = (n) => typeof n === 'number' && Number.isFinite(n) && n >= 0;
+    if (!['running', 'paused', 'complete'].includes(raw.status)) return null;
+    if (!okNum(raw.durationMs) || raw.durationMs < 60000 || raw.durationMs > 180 * 60000) return null;
+    const t = {
+      status: raw.status,
+      durationMs: raw.durationMs,
+      endAt: okNum(raw.endAt) ? raw.endAt : 0,
+      remainingMs: okNum(raw.remainingMs) ? Math.min(raw.remainingMs, raw.durationMs) : raw.durationMs,
+      objective: typeof raw.objective === 'string' ? raw.objective.slice(0, OBJECTIVE_MAX) : ''
+    };
+    if (t.status === 'running' && t.endAt <= Date.now()) { t.status = 'complete'; t.remainingMs = 0; t.endAt = 0; }
+    return t;
+  }
+
+  /* ======================================================================
+     Settings -> timeline
+     ====================================================================== */
+  function rebuildTimeline() {
+    const s = state.settings;
+    const dob = parseLocalDate(s.dob);
+    state.timeline = null;
+    if (!dob) return;
+    let end = null;
+    if (s.mode === 'years') end = addYears(dob, s.lifespan);
+    else end = parseLocalDate(s.target);
+    if (!end || end <= dob) return;
+    state.timeline = { dob, end };
+  }
+
+  function applyAccent() {
+    document.documentElement.setAttribute('data-accent', state.settings.accent === 'amber' ? 'amber' : 'red');
+  }
+
+  function persistSettings() { writeJSON(KEYS.settings, state.settings); }
+
+  /* ======================================================================
+     Rendering — life, progress, today, prompt
+     ====================================================================== */
+  function renderLife(now) {
+    const t = state.timeline;
+    const mode = !t ? 'empty' : (t.end <= now ? 'ended' : 'active');
+
+    setHidden(el.lifeEmpty, mode !== 'empty');
+    setHidden(el.lifeEnded, mode !== 'ended');
+    setHidden(el.lifeActive, mode !== 'active');
+    setHidden(el.progActive, mode === 'empty');
+    setHidden(el.progEmpty, mode !== 'empty');
+    if (mode === 'empty') return;
+
+    const dobMs = t.dob.getTime();
+    const endMs = t.end.getTime();
+    const total = endMs - dobMs;
+    const cappedNow = Math.min(now.getTime(), endMs);
+    const lived = clamp(cappedNow - dobMs, 0, total);
+    const pct = clamp((lived / total) * 100, 0, 100).toFixed(2);
+
+    let daysLeft = 0;
+    if (mode === 'active') {
+      const d = calendarDiff(now, t.end);
+      daysLeft = wholeDaysBetween(now, t.end);
+      setText(el.daysBig, fmtInt(daysLeft));
+      setText(el.uYears, String(d.years));
+      setText(el.uMonths, String(d.months));
+      setText(el.uDays, String(d.days));
+      setText(el.uHours, pad2(d.hours));
+      setText(el.uMinutes, pad2(d.minutes));
+      if (setText(el.uSeconds, pad2(d.seconds))) pulse(el.uSeconds);
+    }
+
+    setText(el.pctText, pct + '% USED');
+    setStyle(el.lifeBar, 'width', pct + '%');
+    el.lifeBarTrack.setAttribute('aria-valuenow', pct);
+    setText(el.daysLived, fmtInt(wholeDaysBetween(t.dob, new Date(cappedNow))) + ' DAYS LIVED');
+    setText(el.daysLeft, fmtInt(daysLeft) + ' DAYS REMAINING');
+  }
+
+  function renderToday(now) {
+    const start = startOfDay(now);
+    const end = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1);
+    const total = end - start;
+    const secs = clamp(Math.floor((end - now) / 1000), 0, 86399);
+    const pct = clamp(((now - start) / total) * 100, 0, 100);
+    setText(el.todayTime, pad2(Math.floor(secs / 3600)) + ':' + pad2(Math.floor((secs % 3600) / 60)) + ':' + pad2(secs % 60));
+    setText(el.todayPct, pct.toFixed(1) + '% USED');
+    setStyle(el.todayBar, 'width', pct.toFixed(2) + '%');
+  }
+
+  function renderDayStatics(now) {
+    let label = toKey(now);
+    try {
+      label = now.toLocaleDateString('en-GB', { weekday: 'short', day: '2-digit', month: 'short', year: 'numeric' }).toUpperCase();
+    } catch (_) { /* keep ISO label */ }
+    setText(el.dateLabel, label);
+    const idx = Math.floor(Date.UTC(now.getFullYear(), now.getMonth(), now.getDate()) / DAY_MS) % PROMPTS.length;
+    setText(el.quote, PROMPTS[idx]);
+  }
+
+  /* ======================================================================
+     Objective
+     ====================================================================== */
+  const currentObjectiveText = () => (state.objective.locked ? state.objective.text : el.objInput.value.trim());
+
+  function renderObjective() {
+    const o = state.objective;
+    setHidden(el.objEdit, o.locked);
+    setHidden(el.objView, !o.locked);
+    if (o.locked) {
+      setText(el.objText, o.text);
+      setText(el.objState, o.done ? '[x] OBJECTIVE COMPLETED' : '[ ] OBJECTIVE LOCKED');
+      el.objState.classList.toggle('is-done', o.done);
+      setText(el.completeBtn, o.done ? 'REOPEN' : 'MARK COMPLETE');
+    }
+    renderStartButton();
+  }
+
+  function renderStartButton() {
+    const has = currentObjectiveText().length > 0;
+    el.startBtn.disabled = !has;
+    setHidden(el.startHint, has);
+  }
+
+  function updateCount() { setText(el.objCount, el.objInput.value.length + '/' + OBJECTIVE_MAX); }
+
+  function saveObjective() { writeJSON(KEYS.objective, state.objective); }
+
+  function onObjectiveInput() {
+    const o = state.objective;
+    o.text = el.objInput.value.slice(0, OBJECTIVE_MAX);
+    if (!o.createdAt && o.text.trim()) o.createdAt = Date.now();
+    setText(el.objMsg, '');
+    el.objInput.removeAttribute('aria-invalid');
+    updateCount();
+    renderStartButton();
+    saveObjective();
+  }
+
+  function lockObjective(silent) {
+    const text = el.objInput.value.trim();
+    if (!text) {
+      setText(el.objMsg, 'Define one meaningful action first.');
+      el.objInput.setAttribute('aria-invalid', 'true');
+      el.objInput.focus();
+      return false;
+    }
+    const o = state.objective;
+    o.text = text.slice(0, OBJECTIVE_MAX);
+    o.locked = true;
+    o.done = false;
+    o.date = state.dayKey;
+    if (!o.createdAt) o.createdAt = Date.now();
+    saveObjective();
+    renderObjective();
+    if (!silent) { announce('Objective locked.'); el.objText.focus(); }
+    return true;
+  }
+
+  function editObjective() {
+    const o = state.objective;
+    o.locked = false;
+    o.done = false;
+    el.objInput.value = o.text;
+    updateCount();
+    saveObjective();
+    renderObjective();
+    el.objInput.focus();
+    el.objInput.setSelectionRange(o.text.length, o.text.length);
+  }
+
+  function toggleComplete() {
+    const o = state.objective;
+    if (!o.locked) return;
+    o.done = !o.done;
+    saveObjective();
+    renderObjective();
+    announce(o.done ? 'OBJECTIVE COMPLETED' : 'Objective reopened.');
+  }
+
+  /** New local day: archive yesterday's objective (max 7 kept) and reset. */
+  function rolloverIfNewDay(now) {
+    const key = toKey(now);
+    if (key === state.dayKey) return;
+    state.dayKey = key;
+    if (state.objective.date !== key) {
+      archiveObjective(state.objective);
+      state.objective = emptyObjective(key);
+      el.objInput.value = '';
+      updateCount();
+      saveObjective();
+      renderObjective();
+    }
+    renderDayStatics(now);
+  }
+
+  /* ======================================================================
+     Focus timer (timestamp-based; survives tab throttling and refresh)
+     ====================================================================== */
+  const settingsFocusMinutes = () => (state.settings.focus === 'custom' ? state.settings.focusCustom : Number(state.settings.focus));
+
+  function persistTimer() {
+    if (state.timer) writeJSON(KEYS.timer, state.timer); else { Store.remove(KEYS.timer); updateNotice(); }
+  }
+
+  function timerRemainingMs() {
+    const t = state.timer;
+    if (!t) return 0;
+    if (t.status === 'running') return Math.max(0, t.endAt - Date.now());
+    if (t.status === 'complete') return 0;
+    return t.remainingMs;
+  }
+
+  function fmtMMSS(ms) {
+    const total = Math.ceil(ms / 1000);
+    return pad2(Math.floor(total / 60)) + ':' + pad2(total % 60);
+  }
+
+  function renderTimerDisplay() {
+    const t = state.timer;
+    if (!t) return;
+    const rem = timerRemainingMs();
+    const text = fmtMMSS(rem);
+    if (setText(el.runTime, text)) document.title = (t.status === 'complete' ? 'DONE' : text) + ' \u00b7 DEAD CLOCK';
+    const p = clamp((1 - rem / t.durationMs) * 100, 0, 100).toFixed(2);
+    if (el.ring.style.getPropertyValue('--p') !== p) el.ring.style.setProperty('--p', p);
+  }
+
+  function renderFocus() {
+    const t = state.timer;
+    el.app.classList.toggle('is-focus', !!t);
+    setHidden(el.focusRun, !t);
+    if (!t) { document.title = 'DEAD CLOCK'; setText(el.runMsg, ''); return; }
+    setText(el.runObjective, t.objective || 'No objective set');
+    setText(el.runState, 'STATUS: ' + t.status.toUpperCase());
+    setHidden(el.pauseBtn, t.status !== 'running');
+    setHidden(el.resumeBtn, t.status !== 'paused');
+    setText(el.runMsg, t.status === 'complete' ? 'SESSION COMPLETE. DECIDE WHAT COMES NEXT.' : '');
+    renderTimerDisplay();
+  }
+
+  function beep() {
+    if (!state.settings.sound) return;
+    try {
+      const AC = window.AudioContext || window.webkitAudioContext;
+      if (!AC) return;
+      const ctx = new AC();
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.type = 'sine';
+      osc.frequency.value = 660;
+      gain.gain.setValueAtTime(0.0001, ctx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.12, ctx.currentTime + 0.02);
+      gain.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + 0.35);
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.onended = () => { try { ctx.close(); } catch (_) { /* ignore */ } };
+      osc.start();
+      osc.stop(ctx.currentTime + 0.4);
+    } catch (_) { /* audio unavailable: stay silent */ }
+  }
+
+  function completeTimer() {
+    const t = state.timer;
+    if (!t || t.status === 'complete') return;
+    t.status = 'complete';
+    t.remainingMs = 0;
+    t.endAt = 0;
+    persistTimer();
+    renderFocus();
+    announce('SESSION COMPLETE. DECIDE WHAT COMES NEXT.');
+    beep();
+  }
+
+  function startTimer(minutes) {
+    const durationMs = minutes * 60000;
+    const now = Date.now();
+    state.timer = { status: 'running', durationMs, endAt: now + durationMs, remainingMs: durationMs, objective: state.objective.text };
+    persistTimer();
+    el.runTime.textContent = '';   // force title/ring refresh
+    renderFocus();
+    tick();
+    el.pauseBtn.focus();
+  }
+
+  function pauseTimer() {
+    const t = state.timer;
+    if (!t || t.status !== 'running') return;
+    t.remainingMs = Math.max(0, t.endAt - Date.now());
+    t.endAt = 0;
+    t.status = 'paused';
+    persistTimer();
+    renderFocus();
+    el.resumeBtn.focus();
+  }
+
+  function resumeTimer() {
+    const t = state.timer;
+    if (!t || t.status !== 'paused') return;
+    t.endAt = Date.now() + t.remainingMs;
+    t.status = 'running';
+    persistTimer();
+    renderFocus();
+    tick();
+    el.pauseBtn.focus();
+  }
+
+  /** RESET: back to the full duration, paused and ready to resume. */
+  function resetTimer() {
+    const t = state.timer;
+    if (!t) return;
+    t.status = 'paused';
+    t.remainingMs = t.durationMs;
+    t.endAt = 0;
+    persistTimer();
+    renderFocus();
+    el.runTime.textContent = '';
+    renderTimerDisplay();
+    el.resumeBtn.focus();
+  }
+
+  function endSession() {
+    state.timer = null;
+    persistTimer();
+    renderFocus();
+    announce('Focus session ended.');
+    renderStartButton();
+    el.startBtn.focus();
+  }
+
+  /* ---- Setup (duration picker before START NOW) ---- */
+  function renderSetup() {
+    setRadio('setupFocus', state.settings.focus);
+    el.setupCustomInput.value = String(state.settings.focusCustom);
+    setHidden(el.setupCustomRow, state.settings.focus !== 'custom');
+  }
+
+  function readSetupMinutes() {
+    const choice = getRadio('setupFocus') || state.settings.focus;
+    if (choice !== 'custom') return { ok: true, minutes: Number(choice) };
+    const raw = el.setupCustomInput.value.trim();
+    const n = Number(raw);
+    if (raw === '' || !Number.isInteger(n) || n < 1 || n > 180) return { ok: false };
+    return { ok: true, minutes: n };
+  }
+
+  function onSetupChange() {
+    const choice = getRadio('setupFocus');
+    if (!choice) return;
+    state.settings.focus = choice;
+    setHidden(el.setupCustomRow, choice !== 'custom');
+    setText(el.setupErr, '');
+    el.setupCustomInput.removeAttribute('aria-invalid');
+    if (choice === 'custom') {
+      const r = readSetupMinutes();
+      if (r.ok) state.settings.focusCustom = r.minutes;
+    }
+    if (!state.firstVisit) persistSettings();
+  }
+
+  function onStartNow() {
+    if (!currentObjectiveText()) { renderStartButton(); return; }
+    const r = readSetupMinutes();
+    if (!r.ok) {
+      setText(el.setupErr, 'Enter a whole number from 1 to 180.');
+      el.setupCustomInput.setAttribute('aria-invalid', 'true');
+      el.setupCustomInput.focus();
+      return;
+    }
+    if (!state.objective.locked && !lockObjective(true)) return;
+    startTimer(r.minutes);
+  }
+
+  /* ======================================================================
+     Central tick: one timeout chain, re-synced to the next second boundary
+     ====================================================================== */
+  function tick() {
+    window.clearTimeout(state.tickId);
+    const now = new Date();
+    rolloverIfNewDay(now);
+    renderLife(now);
+    renderToday(now);
+    if (state.timer) {
+      if (state.timer.status === 'running' && state.timer.endAt <= Date.now()) completeTimer();
+      else renderTimerDisplay();
+    }
+    state.tickId = window.setTimeout(tick, 1000 - (Date.now() % 1000) + 8);
+  }
+
+  /* ======================================================================
+     Settings modal
+     ====================================================================== */
+  const FIELD_ERRORS = [['fDob', 'eDob'], ['fLifespan', 'eLifespan'], ['fTarget', 'eTarget'], ['fFocusCustom', 'eFocus']];
+
+  function clearFormErrors() {
+    FIELD_ERRORS.forEach((pair) => {
+      setText(el[pair[1]], '');
+      el[pair[0]].removeAttribute('aria-invalid');
+    });
+  }
+
+  function updateFormVisibility() {
+    setHidden(el.rowLifespan, getRadio('mode') !== 'years');
+    setHidden(el.rowTarget, getRadio('mode') !== 'date');
+    setHidden(el.rowFocusCustom, getRadio('focus') !== 'custom');
+  }
+
+  function fillForm() {
+    const s = state.settings;
+    el.fDob.value = s.dob;
+    el.fDob.max = toKey(new Date());
+    setRadio('mode', s.mode);
+    el.fLifespan.value = String(s.lifespan);
+    el.fTarget.value = s.target;
+    setRadio('accent', s.accent);
+    setRadio('focus', s.focus);
+    el.fFocusCustom.value = String(s.focusCustom);
+    el.fSound.checked = s.sound;
+    clearFormErrors();
+    updateFormVisibility();
+  }
+
+  function isModalOpen() { return el.settingsModal.classList.contains('is-open'); }
+
+  function openSettings(opts) {
+    const onboarding = !!(opts && opts.onboarding);
+    fillForm();
+    setHidden(el.advanced, onboarding);
+    setHidden(el.onboardNote, !onboarding);
+    setHidden(el.resetConfirm, true);
+    el.resetBtn.setAttribute('aria-expanded', 'false');
+    el.settingsModal.classList.add('is-open');
+    el.app.inert = true;
+    document.documentElement.classList.add('modal-open');
+    window.requestAnimationFrame(() => el.fDob.focus());
+  }
+
+  function closeSettings() {
+    el.settingsModal.classList.remove('is-open');
+    el.app.inert = false;
+    document.documentElement.classList.remove('modal-open');
+    el.settingsBtn.focus();
+  }
+
+  function showFieldError(inputKey, errKey, msg) {
+    setText(el[errKey], msg);
+    el[inputKey].setAttribute('aria-invalid', 'true');
+  }
+
+  /** Validate the settings form. Returns { ok, values } and renders errors under fields. */
+  function validateForm() {
+    clearFormErrors();
+    const bad = [];
+    const fail = (inputKey, errKey, msg) => { showFieldError(inputKey, errKey, msg); bad.push(inputKey); };
+    const today = startOfDay(new Date());
+    const v = { mode: getRadio('mode') === 'date' ? 'date' : 'years' };
+
+    // Date of birth
+    const dobStr = el.fDob.value;
+    const dob = parseLocalDate(dobStr);
+    if (!dobStr) fail('fDob', 'eDob', 'Enter your date of birth.');
+    else if (!dob) fail('fDob', 'eDob', 'Enter a valid date.');
+    else if (dob > today) fail('fDob', 'eDob', 'Date of birth cannot be in the future.');
+    else if (dob.getFullYear() < 1900) fail('fDob', 'eDob', 'Choose a date in or after 1900.');
+    v.dob = dob && dob <= today && dob.getFullYear() >= 1900 ? dobStr : '';
+
+    // Lifespan or target date
+    v.lifespan = state.settings.lifespan;
+    v.target = state.settings.target;
+    if (v.mode === 'years') {
+      const raw = el.fLifespan.value.trim();
+      const n = Number(raw);
+      if (raw === '' || !Number.isInteger(n) || n < 1 || n > 150) fail('fLifespan', 'eLifespan', 'Enter a whole number from 1 to 150.');
+      else v.lifespan = n;
+    } else {
+      const tStr = el.fTarget.value;
+      const target = parseLocalDate(tStr);
+      if (!tStr) fail('fTarget', 'eTarget', 'Choose a target date.');
+      else if (!target) fail('fTarget', 'eTarget', 'Enter a valid date.');
+      else if (dob && target <= dob) fail('fTarget', 'eTarget', 'Target date must be after your date of birth.');
+      else v.target = tStr;
+    }
+
+    // Accent, focus, sound
+    v.accent = getRadio('accent') === 'amber' ? 'amber' : 'red';
+    const focus = getRadio('focus');
+    v.focus = focus === '50' ? '50' : focus === 'custom' ? 'custom' : '25';
+    v.focusCustom = state.settings.focusCustom;
+    if (v.focus === 'custom') {
+      const raw = el.fFocusCustom.value.trim();
+      const n = Number(raw);
+      if (raw === '' || !Number.isInteger(n) || n < 1 || n > 180) fail('fFocusCustom', 'eFocus', 'Enter a whole number from 1 to 180.');
+      else v.focusCustom = n;
+    }
+    v.sound = el.fSound.checked;
+
+    if (bad.length) el[bad[0]].focus();
+    return { ok: bad.length === 0, values: v };
+  }
+
+  function saveSettings() {
+    // In onboarding the advanced fields are hidden; keep existing values for them.
+    const result = validateForm();
+    if (!result.ok) return;
+    state.settings = result.values;
+    state.firstVisit = false;
+    persistSettings();
+    applyAccent();
+    rebuildTimeline();
+    renderSetup();
+    tick();
+    closeSettings();
+    announce('Settings saved.');
+  }
+
+  function doResetData() {
+    window.clearTimeout(state.tickId);
+    Store.clear();
+    state.settings = defaultSettings();
+    state.firstVisit = true;
+    state.objective = emptyObjective(state.dayKey);
+    state.history = [];
+    state.timer = null;
+    el.objInput.value = '';
+    updateCount();
+    applyAccent();
+    rebuildTimeline();
+    renderObjective();
+    renderSetup();
+    renderFocus();
+    updateNotice();
+    tick();
+    closeSettings();
+    announce('All local data erased.');
+  }
+
+  /* ---- Focus trap + Escape ---- */
+  function onDocumentKeydown(e) {
+    if (!isModalOpen()) return;
+    if (e.key === 'Escape') { e.preventDefault(); closeSettings(); return; }
+    if (e.key !== 'Tab') return;
+    const nodes = Array.prototype.slice.call(el.settingsDialog.querySelectorAll('button, input, [tabindex]:not([tabindex="-1"])'))
+      .filter((n) => !n.disabled && !n.hidden && n.getClientRects().length > 0);
+    if (!nodes.length) return;
+    const first = nodes[0];
+    const last = nodes[nodes.length - 1];
+    const active = document.activeElement;
+    if (e.shiftKey && (active === first || !el.settingsDialog.contains(active))) { e.preventDefault(); last.focus(); }
+    else if (!e.shiftKey && (active === last || !el.settingsDialog.contains(active))) { e.preventDefault(); first.focus(); }
+  }
+
+  /* ======================================================================
+     Wiring
+     ====================================================================== */
+  function bindEvents() {
+    // Settings entry points
+    el.settingsBtn.addEventListener('click', () => openSettings());
+    el.configureBtn.addEventListener('click', () => openSettings());
+    el.adjustBtn.addEventListener('click', () => openSettings());
+
+    // Settings modal
+    el.settingsForm.addEventListener('submit', (e) => { e.preventDefault(); saveSettings(); });
+    el.cancelBtn.addEventListener('click', closeSettings);
+    el.settingsModal.addEventListener('mousedown', (e) => { if (e.target === el.settingsModal) closeSettings(); });
+    radios('mode').concat(radios('focus')).forEach((r) => r.addEventListener('change', updateFormVisibility));
+    FIELD_ERRORS.forEach((pair) => {
+      el[pair[0]].addEventListener('input', () => { setText(el[pair[1]], ''); el[pair[0]].removeAttribute('aria-invalid'); });
+    });
+    el.resetBtn.addEventListener('click', () => {
+      setHidden(el.resetConfirm, false);
+      el.resetBtn.setAttribute('aria-expanded', 'true');
+      el.resetNo.focus();
+    });
+    el.resetNo.addEventListener('click', () => {
+      setHidden(el.resetConfirm, true);
+      el.resetBtn.setAttribute('aria-expanded', 'false');
+      el.resetBtn.focus();
+    });
+    el.resetYes.addEventListener('click', doResetData);
+    document.addEventListener('keydown', onDocumentKeydown);
+
+    // Objective
+    el.objInput.addEventListener('input', onObjectiveInput);
+    el.objInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); lockObjective(false); } });
+    el.lockBtn.addEventListener('click', () => lockObjective(false));
+    el.editBtn.addEventListener('click', editObjective);
+    el.completeBtn.addEventListener('click', toggleComplete);
+
+    // Focus
+    radios('setupFocus').forEach((r) => r.addEventListener('change', onSetupChange));
+    el.setupCustomInput.addEventListener('input', () => {
+      setText(el.setupErr, '');
+      el.setupCustomInput.removeAttribute('aria-invalid');
+      const r = readSetupMinutes();
+      if (r.ok) { state.settings.focusCustom = r.minutes; if (!state.firstVisit) persistSettings(); }
+    });
+    el.startBtn.addEventListener('click', onStartNow);
+    el.pauseBtn.addEventListener('click', pauseTimer);
+    el.resumeBtn.addEventListener('click', resumeTimer);
+    el.resetTimerBtn.addEventListener('click', resetTimer);
+    el.endBtn.addEventListener('click', endSession);
+
+    // Re-sync after the tab/device was asleep or hidden
+    document.addEventListener('visibilitychange', () => { if (!document.hidden) tick(); });
+    window.addEventListener('pageshow', tick);
+    window.addEventListener('pagehide', () => window.clearTimeout(state.tickId));
+  }
+
+  /* ======================================================================
+     Init
+     ====================================================================== */
+  function init() {
+    const loaded = loadSettings();
+    state.settings = loaded.settings;
+    state.firstVisit = !loaded.found;
+    state.dayKey = toKey(new Date());
+    state.history = loadHistory();
+    state.objective = loadObjective(state.dayKey);
+    state.timer = loadTimer();
+
+    applyAccent();
+    rebuildTimeline();
+    el.objInput.value = state.objective.locked ? '' : state.objective.text;
+    updateCount();
+    renderDayStatics(new Date());
+    renderObjective();
+    renderSetup();
+    renderFocus();
+    updateNotice();
+    bindEvents();
+    tick();
+
+    if (state.firstVisit) openSettings({ onboarding: true });
+  }
+
+  init();
+})();
+</script>
+</body>
+</html>
