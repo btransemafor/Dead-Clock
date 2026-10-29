@@ -75,7 +75,12 @@
     gap: var(--s3); flex-wrap: wrap; padding-bottom: var(--s3);
     border-bottom: 1px solid var(--line);
   }
-  .brand { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+  .brand-row {
+    display: flex; align-items: center; gap: var(--s2);
+    flex-wrap: wrap;
+  }
+  .brand {
+    display: flex; flex-direction: column; gap: 2px; min-width: 0; }
   .logo { font-size: clamp(1rem, 3.6vw, 1.25rem); font-weight: 700; letter-spacing: .22em; }
   .status { display: flex; align-items: center; gap: var(--s2); font-size: .68rem; letter-spacing: .18em; color: var(--muted); }
   .status-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--accent); flex: none; animation: breathe 2.6s ease-in-out infinite; }
@@ -131,7 +136,22 @@
     line-height: 1; font-weight: 700; letter-spacing: -.02em;
     font-variant-numeric: tabular-nums; overflow-wrap: anywhere;
   }
-  .days-label { margin-top: var(--s2); font-size: .78rem; letter-spacing: .3em; color: var(--accent-text); }
+  .days-row {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+  }
+  .days-row .days-big { margin-top: var(--s3); }
+  .days-row > .skull-mark {
+    width: clamp(56px, 10vw, 84px);
+    height: clamp(56px, 10vw, 84px);
+    flex: 0 0 clamp(56px, 10vw, 84px);
+    display: block;
+    color: var(--accent-text);
+    fill: currentColor;
+  }
   .units { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--s2); margin-top: var(--s5); }
   .unit { border: 1px solid var(--line); padding: var(--s3) var(--s2); display: flex; flex-direction: column; align-items: center; gap: 2px; min-width: 0; }
   .unit-val { display: inline-block; font-size: clamp(1.2rem, 5vw, 1.75rem); font-weight: 600; font-variant-numeric: tabular-nums; }
@@ -268,13 +288,13 @@
 
 <div class="app" id="app">
   <header class="header">
-    <div class="brand">
-      <h1 class="logo">DEAD CLOCK<span class="cursor" aria-hidden="true">_</span></h1>
-      <p class="status"><span class="status-dot" aria-hidden="true"></span><span>SYSTEM ACTIVE · GMT+7</span></p>
-    </div>
+  
     <button type="button" class="btn btn-ghost btn-sm" id="settingsBtn" aria-label="Open settings" aria-haspopup="dialog">[ SETTINGS ]</button>
   </header>
   <p class="tagline">A quiet reminder that your time is finite.</p>
+  <div class="death-emblem" aria-hidden="true">
+    
+  </div>
   <p class="notice" id="storageNotice" role="status" hidden>Local saving is unavailable in this embed. Using the default timeline.</p>
   <p class="sr-only" id="globalStatus" aria-live="polite"></p>
 
@@ -287,7 +307,13 @@
         <p class="small end-line num" id="endLine" hidden></p>
 
         <div id="lifeActive" hidden>
-          <p class="days-big" id="daysBig">0</p>
+          <div class="days-row">
+            <p class="days-big" id="daysBig">0</p>
+            <svg class="skull-mark" viewBox="0 0 64 64" aria-hidden="true" fill="currentColor">
+              <path d="M32 4C17.6 4 8 14.2 8 29c0 9.2 4.2 16.2 11 20v11h26V49c6.8-3.8 11-10.8 11-20C56 14.2 46.4 4 32 4Zm-13 34c0-4.2 2.8-7 7-7s7 2.8 7 7-2.8 7-7 7-7-2.8-7-7Zm20-7c4.2 0 7 2.8 7 7s-2.8 7-7 7-7-2.8-7-7 2.8-7 7-7Zm-7 14c2.7 0 4.9 2.2 4.9 4.9h-9.8C27.1 47.2 29.3 45 32 45ZM19 54h26v6H19v-6Z"/>
+            </svg>
+          </div>
+          
           <p class="days-label">DAYS REMAINING</p>
           <div class="units" aria-label="Time remaining by unit">
             <div class="unit"><span class="unit-val" id="uYears">0</span><span class="unit-name">YEARS</span></div>
@@ -307,6 +333,15 @@
         </div>
 
         <div id="lifeEnded" class="state-box" hidden>
+          <span class="die-stamp" aria-hidden="true">DIE</span>
+          <div class="life-ended-visual" aria-hidden="true">
+            <svg class="tombstone" viewBox="0 0 120 120" fill="currentColor">
+              <path d="M60 8c-25 0-42 18-42 43v54h84V51C102 26 85 8 60 8Zm0 10c19 0 32 14 32 33v44H28V51c0-19 13-33 32-33Z" opacity=".85"/>
+              <path d="M60 28c7 0 12 5 12 12H48c0-7 5-12 12-12Zm-20 30h40v6H40v-6Zm0 13h40v6H40v-6Zm14 13h12v5H54v-5Z" opacity=".65"/>
+              <path d="M18 105h84v15H18z"/>
+            </svg>
+          </div>
+          <p class="tombstone-rip">R.I.P. // TIME ENDED</p>
           <p class="state-title">THE CONFIGURED TIMELINE HAS ENDED.</p>
           <p class="small">Adjust it whenever you like. Today is still yours to use.</p>
           <button type="button" class="btn" id="adjustBtn">ADJUST TIMELINE</button>
@@ -429,6 +464,9 @@
     </section>
   </main>
 
+  <div class="graveyard" aria-hidden="true">
+    <svg viewBox="0 0 100 76"><path d="M8 76V42c0-11 8-19 18-19s18 8 18 19v34H8Zm9-7h18V42c0-5-4-9-9-9s-9 4-9 9v27ZM26 47h9v8h-9v-8Zm29 29V20c0-10 7-17 17-17s17 7 17 17v56H55Zm8-7h18V20c0-5-4-9-9-9s-9 4-9 9v49Zm8-51h10v10H71V18Z"/></svg>
+  </div>
   <footer class="footer">
     <ul class="tags">
       <li>LOCAL-FIRST</li>
@@ -497,7 +535,7 @@
         </div>
         <div id="wrapDurCustom" hidden>
           <label class="field-label" for="fDurCustom">Custom minutes (1–180)</label>
-          <input class="input" type="number" id="fDurCustom" min="1" max="180" step="1" inputmode="numeric" aria-describedby="eDurCustom">
+          <input class="input" id="fDurCustom" min="1" max="180" step="1" inputmode="numeric" aria-describedby="eDurCustom">
           <p class="field-error" id="eDurCustom" aria-live="polite"></p>
         </div>
       </fieldset>
